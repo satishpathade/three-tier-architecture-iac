@@ -1,0 +1,23 @@
+[Unit]
+Description={{ app_name }} Node.js Application
+After=network.target
+
+[Service]
+Type=simple
+User={{ app_user }}
+WorkingDirectory={{ app_dir }}
+Environment=NODE_ENV=production
+EnvironmentFile={{ app_dir }}/.env
+ExecStart=/usr/bin/node {{ app_dir }}/app.js
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier={{ app_name }}
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

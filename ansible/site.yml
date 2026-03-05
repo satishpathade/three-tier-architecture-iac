@@ -1,0 +1,39 @@
+---
+- name: Configure Node.js Application Servers
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    nodejs_version: "18"
+    app_name: "nodejs-app"
+    app_dir: "/opt/{{ app_name }}"
+    app_user: "nodeapp"
+    app_port: 3000
+
+  roles:
+    - common
+    - nodejs_app
+    - nginx
+
+  tasks:
+    - name: Ensure application is running
+      systemd:
+        name: "{{ app_name }}"
+        state: started
+        enabled: yes
+
+    - name: Wait for application to be ready
+      wait_for:
+        port: "{{ app_port }}"
+        delay: 5
+        timeout: 60
+
+    - name: Health check
+      uri:
+        url: "http://localhost:{{ app_port }}/health"
+        status_code: 200
+      register: health_check
+      retries: 3
+      delay: 5
+      until: health_check.status == 200

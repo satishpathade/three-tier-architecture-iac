@@ -1,0 +1,21 @@
+---
+plugin: aws_ec2
+
+regions:
+  - ap-south-1
+
+filters:
+  tag:Application: aws-three-tier-iac
+  instance-state-name: running
+
+keyed_groups:
+  - key: tags.Environment
+    prefix: env
+  - key: placement.availability_zone
+    prefix: az
+
+hostnames:
+  - ip-address
+
+compose:
+  ansible_host: public_ip_address

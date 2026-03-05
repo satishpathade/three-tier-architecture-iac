@@ -1,0 +1,57 @@
+---
+- name: Update all packages
+  yum:
+    name: '*'
+    state: latest
+    update_cache: yes
+
+- name: Install common packages
+  yum:
+    name:
+      - git
+      - curl
+      - wget
+      - vim
+      - nano 
+      - htop
+      - unzip
+      - tar
+      - gcc
+      - make
+    state: present
+
+- name: Set timezone
+  timezone:
+    name: UTC
+
+- name: Configure firewall
+  firewalld:
+    port: "{{ item }}"
+    permanent: yes
+    state: enabled
+    immediate: yes
+  loop:
+    - 80/tcp
+    - 443/tcp
+    - 3000/tcp
+  ignore_errors: yes
+
+- name: Disable SELinux (for development)
+  selinux:
+    state: disabled
+  when: ansible_selinux.status == "enabled"
+
+- name: Create application user
+  user:
+    name: "{{ app_user }}"
+    shell: /bin/bash
+    createhome: yes
+    state: present
+
+- name: Create application directory
+  file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'

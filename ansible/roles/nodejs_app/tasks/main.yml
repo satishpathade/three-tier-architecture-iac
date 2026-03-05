@@ -1,0 +1,103 @@
+---
+- name: Install Node.js repository
+  shell: |
+    curl -sL https://rpm.nodesource.com/setup_{{ nodejs_version }}.x | bash -
+  args:
+    creates: /etc/yum.repos.d/nodesource-el.repo
+
+- name: Install Node.js
+  yum:
+    name: nodejs
+    state: present
+
+- name: Verify Node.js installation
+  command: node --version
+  register: node_version
+  changed_when: false
+
+- name: Display Node.js version
+  debug:
+    msg: "Node.js version: {{ node_version.stdout }}"
+
+- name: Install PM2 globally
+  npm:
+    name: pm2
+    global: yes
+    state: present
+
+- name: Create application directory structure
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0755'
+  loop:
+    - "{{ app_dir }}"
+    - "{{ app_dir }}/logs"
+
+- name: Copy application files
+  synchronize:
+    src: ../../../src/
+    dest: "{{ app_dir }}/"
+    rsync_opts:
+      - "--exclude=node_modules"
+      - "--exclude=.env"
+  become_user: "{{ app_user }}"
+
+- name: Set ownership of application files
+  file:
+    path: "{{ app_dir }}"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    recurse: yes
+
+- name: Create .env file from template
+  template:
+    src: .env.j2
+    dest: "{{ app_dir }}/.env"
+    owner: "{{ app_user }}"
+    group: "{{ app_user }}"
+    mode: '0600'
+
+- name: Install application dependencies
+  npm:
+    path: "{{ app_dir }}"
+    state: present
+  become_user: "{{ app_user }}"
+
+- name: Create systemd service file
+  template:
+    src: app.service.j2
+    dest: /etc/systemd/system/{{ app_name }}.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart application
+
+- name: Initialize database schema
+  shell: |
+    PGPASSWORD="{{ db_password }}" psql -h {{ db_host }} -U {{ db_username }} -d {{ db_name }} << EOF
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username VARCHAR(50) UNIQUE NOT NULL,
+      email VARCHAR(100) UNIQUE NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    INSERT INTO users (username, email) VALUES ('testuser', 'test@example.com')
+    ON CONFLICT (username) DO NOTHING;
+    EOF
+  args:
+    executable: /bin/bash
+  become_user: "{{ app_user }}"
+  environment:
+    PGPASSWORD: "{{ db_password }}"
+  ignore_errors: yes
+
+- name: Enable and start application service
+  systemd:
+    name: "{{ app_name }}"
+    state: started
+    enabled: yes
+    daemon_reload: yes
