@@ -1,11 +1,11 @@
 ---
-plugin: aws_ec2
+plugin: amazon.aws.aws_ec2
 
 regions:
   - ap-south-1
 
 filters:
-  tag:Application: aws-three-tier-iac
+  tag:Application: nodejs-app
   instance-state-name: running
 
 keyed_groups:
@@ -19,3 +19,5 @@ hostnames:
 
 compose:
   ansible_host: public_ip_address
+  ansible_user: ubuntu
+  ansible_ssh_private_key_file: /home/ubuntu/masterkey.pem

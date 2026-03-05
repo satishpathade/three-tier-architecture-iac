@@ -1,0 +1,33 @@
+---
+- name: Deploy Node.js application
+  hosts: all
+  become: yes
+
+  tasks:
+
+    - name: Update packages
+      apt:
+        update_cache: yes
+
+    - name: Install Node.js and npm
+      apt:
+        name:
+          - nodejs
+          - npm
+          - git
+        state: present
+
+    - name: Clone application repo
+      git:
+        repo: https://github.com/satishpathade/three-tier-architecture-iac.git
+        dest: /home/ubuntu/nodeapp
+
+    - name: Install dependencies
+      command: npm install
+      args:
+        chdir: /home/ubuntu/nodeapp
+
+    - name: Start application
+      command: nohup npm start &
+      args:
+        chdir: /home/ubuntu/nodeapp

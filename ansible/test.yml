@@ -1,0 +1,8 @@
+---
+- name: Test Ansible connection
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Ping servers
+      ping:
