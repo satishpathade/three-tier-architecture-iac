@@ -5,29 +5,24 @@
 
   tasks:
 
-    - name: Update packages
-      apt:
-        update_cache: yes
-
-    - name: Install Node.js and npm
-      apt:
+    - name: Install Node.js and Git
+      yum:
         name:
           - nodejs
-          - npm
           - git
         state: present
 
-    - name: Clone application repo
+    - name: Clone application repository
       git:
-        repo: https://github.com/satishpathade/three-tier-architecture-iac.git
-        dest: /home/ubuntu/nodeapp
+        repo: https://github.com/YOUR_USERNAME/YOUR_NODE_APP.git
+        dest: /home/ec2-user/nodeapp
 
     - name: Install dependencies
       command: npm install
       args:
-        chdir: /home/ubuntu/nodeapp
+        chdir: /home/ec2-user/nodeapp
 
     - name: Start application
       command: nohup npm start &
       args:
-        chdir: /home/ubuntu/nodeapp
+        chdir: /home/ec2-user/nodeapp
