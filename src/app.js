@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
-const { Pool } = require('pg');
+const mysql = require('mysql2/promise');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,22 +12,27 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
-// Database connection
-const pool = new Pool({
+// Database connection pool
+const pool = mysql.createPool({
   host: process.env.DB_HOST,
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME,
+  port: process.env.DB_PORT || 3306,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  database: process.env.DB_NAME,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
+
+// Root route
+app.get('/', (req, res) => {
+  res.send('Node.js API is running');
 });
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'healthy', 
+  res.status(200).json({
+    status: 'healthy',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   });
@@ -36,23 +41,23 @@ app.get('/health', (req, res) => {
 // Database health check
 app.get('/health/db', async (req, res) => {
   try {
-    const result = await pool.query('SELECT NOW()');
-    res.status(200).json({ 
-      status: 'healthy', 
+    const [rows] = await pool.query('SELECT NOW() as now');
+    res.status(200).json({
+      status: 'healthy',
       database: 'connected',
-      timestamp: result.rows[0].now 
+      timestamp: rows[0].now
     });
   } catch (error) {
     console.error('Database health check failed:', error);
-    res.status(503).json({ 
-      status: 'unhealthy', 
+    res.status(503).json({
+      status: 'unhealthy',
       database: 'disconnected',
-      error: error.message 
+      error: error.message
     });
   }
 });
 
-// Sample API endpoint
+// Application info
 app.get('/api/info', (req, res) => {
   res.json({
     application: 'Node.js AWS Deployment',
@@ -62,15 +67,19 @@ app.get('/api/info', (req, res) => {
   });
 });
 
-// Sample database query endpoint
+// Get users
 app.get('/api/users', async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, username, email, created_at FROM users LIMIT 10');
+    const [rows] = await pool.query(
+      'SELECT id, username, email, created_at FROM users LIMIT 10'
+    );
+
     res.json({
       success: true,
-      count: result.rows.length,
-      data: result.rows
+      count: rows.length,
+      data: rows
     });
+
   } catch (error) {
     console.error('Database query error:', error);
     res.status(500).json({
@@ -81,10 +90,11 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-// Create sample user
+// Create user
 app.post('/api/users', async (req, res) => {
+
   const { username, email } = req.body;
-  
+
   if (!username || !email) {
     return res.status(400).json({
       success: false,
@@ -93,25 +103,31 @@ app.post('/api/users', async (req, res) => {
   }
 
   try {
-    const result = await pool.query(
-      'INSERT INTO users (username, email) VALUES ($1, $2) RETURNING *',
+
+    const [result] = await pool.query(
+      'INSERT INTO users (username, email) VALUES (?, ?)',
       [username, email]
     );
+
     res.status(201).json({
       success: true,
-      data: result.rows[0]
+      userId: result.insertId
     });
+
   } catch (error) {
+
     console.error('Database insert error:', error);
+
     res.status(500).json({
       success: false,
       error: 'Failed to create user',
       message: error.message
     });
+
   }
 });
 
-// 404 handler
+// 404 route
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
@@ -119,7 +135,7 @@ app.use((req, res) => {
 // Error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Internal server error',
     message: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
@@ -127,14 +143,14 @@ app.use((err, req, res, next) => {
 
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`Database: ${process.env.DB_HOST}`);
+  console.log(`Database host: ${process.env.DB_HOST}`);
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
+  console.log('SIGTERM received, closing server');
   pool.end(() => {
     console.log('Database pool closed');
     process.exit(0);
