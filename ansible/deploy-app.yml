@@ -4,7 +4,6 @@
   become: yes
 
   tasks:
-
     - name: Install Node.js and Git
       yum:
         name:
@@ -23,6 +22,8 @@
         chdir: /home/ec2-user/nodeapp
 
     - name: Start application
-      command: nohup npm start &
+      shell: nohup npm start > app.log 2>&1 &
       args:
-        chdir: /home/ec2-user/nodeapp
+        chdir: /home/ec2-user/nodeapp/src
+      async: 10
+      poll: 0
