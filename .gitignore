@@ -48,3 +48,5 @@ Thumbs.db
 # AWS
 .aws/
 aws-credentials.json
+
+.README.md
